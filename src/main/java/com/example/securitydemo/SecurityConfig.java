@@ -2,6 +2,7 @@ package com.example.securitydemo;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -15,15 +16,17 @@ import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 
 
+//Basic Authentication
 public class SecurityConfig {
     @Bean
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests((requests) -> requests.anyRequest().authenticated());
         http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-//        http.formLogin(withDefaults());
-        http.httpBasic(withDefaults());
+//        http.formLogin(withDefaults()); //for Web
+        http.httpBasic(withDefaults()); //for Postman which there is no interface
         return http.build();
     }
 
@@ -32,13 +35,13 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         UserDetails user1 = User.withUsername("user1")
-                .password("{noop}password1")
+                .password("{noop}password1") //tells Spring to save the password as plain text
                 .roles("USER")
                 .build();
         UserDetails admin = User.withUsername("admin")
                 .password("{noop}adminPass")
                 .roles("ADMIN")
                 .build();
-        return new InMemoryUserDetailsManager(user1, admin);
+        return new InMemoryUserDetailsManager(user1, admin); //constructor
     }
 }
