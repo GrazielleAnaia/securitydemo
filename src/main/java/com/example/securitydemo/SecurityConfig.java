@@ -1,16 +1,24 @@
 package com.example.securitydemo;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+
+import javax.sql.DataSource;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
@@ -19,29 +27,46 @@ import static org.springframework.security.config.Customizer.withDefaults;
 @EnableMethodSecurity
 
 
-//Basic Authentication
 public class SecurityConfig {
+
+    @Autowired
+    DataSource dataSource; //Spring bean injects the dependency in pom.xml and application.properties
+
+    //Basic Authentication
     @Bean
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
-        http.authorizeHttpRequests((requests) -> requests.anyRequest().authenticated());
+        http.authorizeHttpRequests((requests) -> requests
+                .requestMatchers("/h2-console/**").permitAll()
+                .anyRequest().authenticated());
         http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 //        http.formLogin(withDefaults()); //for Web
         http.httpBasic(withDefaults()); //for Postman which there is no interface
+        http.headers(headers -> headers.frameOptions(FrameOptionsConfig::sameOrigin));
+        http.csrf(AbstractHttpConfigurer::disable);
         return http.build();
     }
 
 
-    //Basic authentication with in-memory user created
     @Bean
     public UserDetailsService userDetailsService() {
         UserDetails user1 = User.withUsername("user1")
-                .password("{noop}password1") //tells Spring to save the password as plain text
+                .password(passwordEncoder().encode("password1")) //noop tells Spring to save the password as plain text. No encoding has been done.
                 .roles("USER")
                 .build();
         UserDetails admin = User.withUsername("admin")
-                .password("{noop}adminPass")
+                .password(passwordEncoder().encode("adminPass"))
                 .roles("ADMIN")
                 .build();
-        return new InMemoryUserDetailsManager(user1, admin); //constructor
+        //Storing data in the DB
+        JdbcUserDetailsManager userDetailsManager = new JdbcUserDetailsManager(dataSource);
+        userDetailsManager.createUser(user1);
+        userDetailsManager.createUser(admin);
+        return userDetailsManager;
+        //return new InMemoryUserDetailsManager(user1, admin); //constructor to create users in memory
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(); //In-built algorithm to encode
     }
 }
